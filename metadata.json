@@ -1,0 +1,6 @@
+{
+  "name": "FinanZen - Control Financiero y Préstamos",
+  "description": "Gestión integral de ingresos y gastos, préstamos a terceros con cuentas individuales por deudor, seguimiento de deudas con cálculo automático de Tasa Efectiva Anual (E.A.), recordatorios de pago y reportes de flujo de caja sincronizados en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
