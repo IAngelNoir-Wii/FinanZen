@@ -21,8 +21,17 @@ import {
 type NavTab = 'resumen' | 'transacciones' | 'prestamos' | 'deudas' | 'reportes';
 
 function MainApp() {
-  const { data, activeAlerts, syncStatus, lastSyncTime, triggerManualSync, resetData, setCurrency } =
-    useFinance();
+  const {
+    data,
+    activeAlerts,
+    syncStatus,
+    lastSyncTime,
+    triggerManualSync,
+    resetData,
+    setCurrency,
+    exportBackup,
+    importBackup,
+  } = useFinance();
 
   const [activeTab, setActiveTab] = useState<NavTab>('resumen');
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
@@ -255,6 +264,42 @@ function MainApp() {
                 <option value="MXN">MXN ($ México)</option>
               </select>
             </div>
+
+            {/* Export & Import Backup (especially useful for static GitHub Pages) */}
+            <button
+              onClick={exportBackup}
+              className="text-slate-600 hover:text-slate-900 transition-colors font-medium"
+              title="Descargar archivo de respaldo JSON"
+            >
+              Exportar copia
+            </button>
+
+            <label className="text-slate-600 hover:text-slate-900 transition-colors font-medium cursor-pointer">
+              <span>Importar copia</span>
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const text = event.target?.result as string;
+                    if (text) {
+                      const success = importBackup(text);
+                      if (success) {
+                        alert('¡Copia de seguridad restaurada exitosamente!');
+                      } else {
+                        alert('Error al leer el archivo. Asegúrate de que sea un archivo JSON exportado por FinanZen.');
+                      }
+                    }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }}
+              />
+            </label>
 
             {/* Seed / Reset option */}
             <button

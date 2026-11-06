@@ -37,6 +37,8 @@ interface FinanceContextType {
   resetData: (mode?: 'seed' | 'clean') => Promise<void>;
   setCurrency: (currency: string) => void;
   triggerManualSync: () => Promise<void>;
+  exportBackup: () => void;
+  importBackup: (jsonString: string) => boolean;
 }
 
 const LOCAL_STORAGE_KEY = 'finanzen_local_cache_v1';
@@ -554,6 +556,39 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     await syncToServer(data);
   };
 
+  const exportBackup = () => {
+    try {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `finanzen_backup_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error('Error al exportar copia de seguridad:', err);
+    }
+  };
+
+  const importBackup = (jsonString: string): boolean => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (parsed && Array.isArray(parsed.transactions) && Array.isArray(parsed.loans) && Array.isArray(parsed.debts)) {
+        syncToServer({
+          ...parsed,
+          version: (parsed.version || 0) + 1,
+          lastUpdated: new Date().toISOString(),
+        });
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error al importar copia de seguridad:', err);
+      return false;
+    }
+  };
+
   return (
     <FinanceContext.Provider
       value={{
@@ -581,6 +616,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         resetData,
         setCurrency,
         triggerManualSync,
+        exportBackup,
+        importBackup,
       }}
     >
       {children}
