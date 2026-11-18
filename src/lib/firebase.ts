@@ -99,22 +99,25 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): Parti
 /**
  * Garantiza que los IDs generados cumplan con el patrón `^[a-zA-Z0-9_\-]+$` y longitud <= 128.
  */
+let idSequence = 0;
 export function generateSafeId(prefix: string): string {
   const cleanPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 20) || 'id';
+  idSequence = (idSequence + 1) % 1000000;
   const rand = Math.random().toString(36).substring(2, 8);
-  return `${cleanPrefix}-${Date.now()}-${rand}`.slice(0, 128);
+  return `${cleanPrefix}-${Date.now()}-${idSequence}-${rand}`.slice(0, 128);
 }
 
 /**
  * Asegura formato YYYY-MM-DD y límites de texto según firebase-blueprint.json
  */
 export function normalizeDateStr(dateStr?: string): string {
-  if (dateStr && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateStr)) {
+  if (typeof dateStr === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateStr)) {
     return dateStr;
   }
   return new Date().toISOString().split('T')[0];
 }
 
-export function truncateStr(val: string | undefined, maxLen: number): string {
-  return (val || '').trim().slice(0, maxLen);
+export function truncateStr(val: unknown, maxLen: number): string {
+  if (val === null || val === undefined) return '';
+  return String(val).trim().slice(0, maxLen);
 }

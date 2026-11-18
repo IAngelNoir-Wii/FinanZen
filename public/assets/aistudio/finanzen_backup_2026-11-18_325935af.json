@@ -1,0 +1,560 @@
+{
+  "version": 1,
+  "lastUpdated": "2026-11-06T22:36:16.044Z",
+  "currency": "COP",
+  "incomeCategories": [
+    "Salario / Sueldo",
+    "Honorarios / Freelance",
+    "Comisiones / Ventas",
+    "Rendimientos e Inversiones",
+    "Abono Préstamo a Tercero",
+    "Arriendos Recibidos",
+    "Regalos y Otros Ingresos"
+  ],
+  "expenseCategories": [
+    "Vivienda y Servicios Públicos",
+    "Alimentación y Supermercado",
+    "Transporte y Gasolina",
+    "Pago Cuota Deuda Propia",
+    "Préstamo Entregado a Tercero",
+    "Salud y Farmacia",
+    "Educación y Capacitación",
+    "Ocio y Restaurantes",
+    "Ropa y Compras Personales",
+    "Imprevistos y Varios"
+  ],
+  "transactions": [
+    {
+      "type": "egreso",
+      "amount": 99480,
+      "date": "2026-11-07",
+      "category": "Vivienda y Servicios Públicos",
+      "description": "Pago servicios casa",
+      "paymentMethod": "Tarjeta Débito",
+      "isRecurring": false,
+      "id": "tx-1794022105610-ht8c",
+      "createdAt": "2026-11-07T03:28:25.610Z"
+    },
+    {
+      "id": "tx-debtpay-dpay-1794014686687-nuvl",
+      "type": "egreso",
+      "amount": 1841703,
+      "date": "2026-11-07",
+      "category": "Pago Cuota Deuda Propia",
+      "description": "Pago cuota a NU (Tarjeta de credito)",
+      "paymentMethod": "Transferencia",
+      "relatedDebtId": "debt-1794013314949-ywbg",
+      "createdAt": "2026-11-07T01:24:46.687Z"
+    },
+    {
+      "id": "tx-debtpay-dpay-1794014433116-okq3",
+      "type": "egreso",
+      "amount": 144730,
+      "date": "2026-11-07",
+      "category": "Pago Cuota Deuda Propia",
+      "description": "Pago cuota a BBVA (Credito)",
+      "paymentMethod": "Transferencia",
+      "relatedDebtId": "debt-1794013435076-kbmv",
+      "createdAt": "2026-11-07T01:20:33.116Z"
+    },
+    {
+      "id": "tx-debtpay-dpay-1794014143113-gj15",
+      "type": "egreso",
+      "amount": 413328,
+      "date": "2026-11-07",
+      "category": "Pago Cuota Deuda Propia",
+      "description": "Pago cuota a Addi Shop (Credito)",
+      "paymentMethod": "Transferencia",
+      "relatedDebtId": "debt-1794012793385-55ti",
+      "createdAt": "2026-11-07T01:15:43.113Z"
+    },
+    {
+      "type": "egreso",
+      "amount": 69980,
+      "date": "2026-11-07",
+      "category": "Alimentación y Supermercado",
+      "description": "Comida",
+      "paymentMethod": "Tarjeta Débito",
+      "isRecurring": false,
+      "id": "tx-1794013534567-adir",
+      "createdAt": "2026-11-07T01:05:34.567Z"
+    },
+    {
+      "type": "ingreso",
+      "amount": 30000,
+      "date": "2026-11-06",
+      "category": "Regalos y Otros Ingresos",
+      "description": "Dinero Cambiado",
+      "paymentMethod": "Efectivo",
+      "isRecurring": false,
+      "id": "tx-1794005539806-uode",
+      "createdAt": "2026-11-06T22:52:19.806Z"
+    },
+    {
+      "type": "egreso",
+      "amount": 30000,
+      "date": "2026-11-06",
+      "category": "Transferencias",
+      "description": "Cambio dinero Laura",
+      "paymentMethod": "Transferencia",
+      "isRecurring": false,
+      "id": "tx-1794005522019-xz6d",
+      "createdAt": "2026-11-06T22:52:02.019Z"
+    },
+    {
+      "type": "ingreso",
+      "amount": 3500000,
+      "date": "2026-11-06",
+      "category": "Salario / Sueldo",
+      "description": "Pago Prestacion Centrica",
+      "paymentMethod": "Transferencia",
+      "isRecurring": false,
+      "id": "tx-1794005470405-4sag",
+      "createdAt": "2026-11-06T22:51:10.405Z"
+    },
+    {
+      "id": "tx-loan-loan-1794005410724-n6bb",
+      "type": "egreso",
+      "amount": 1151817,
+      "date": "2026-09-20",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a Jhon Daza (Xiaomi)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005410724-n6bb",
+      "createdAt": "2026-11-06T22:50:10.724Z"
+    },
+    {
+      "id": "tx-loan-loan-1794005282547-pdno",
+      "type": "egreso",
+      "amount": 250000,
+      "date": "2026-08-20",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a Jhon Daza (Xbox)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005282547-pdno",
+      "createdAt": "2026-11-06T22:48:02.547Z"
+    },
+    {
+      "id": "tx-loan-loan-1794005235350-57b1",
+      "type": "egreso",
+      "amount": 100000,
+      "date": "2026-07-19",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a SALOME (Prestamo paseo)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005235350-57b1",
+      "createdAt": "2026-11-06T22:47:15.350Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005178543-rooy",
+      "type": "ingreso",
+      "amount": 150000,
+      "date": "2026-08-31",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Orbey Aguirre (Tecnico Mecanica)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005150150-ritp",
+      "createdAt": "2026-11-06T22:46:18.543Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005167351-15n9",
+      "type": "ingreso",
+      "amount": 100000,
+      "date": "2026-07-31",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Orbey Aguirre (Tecnico Mecanica)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005150150-ritp",
+      "createdAt": "2026-11-06T22:46:07.352Z"
+    },
+    {
+      "id": "tx-loan-loan-1794005150150-ritp",
+      "type": "egreso",
+      "amount": 280000,
+      "date": "2026-07-15",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a Orbey Aguirre (Tecnico Mecanica)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794005150150-ritp",
+      "createdAt": "2026-11-06T22:45:50.150Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005067883-a507",
+      "type": "ingreso",
+      "amount": 70000,
+      "date": "2026-10-30",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:44:27.884Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005052452-i4u5",
+      "type": "ingreso",
+      "amount": 100000,
+      "date": "2026-09-30",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:44:12.452Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005041087-f942",
+      "type": "ingreso",
+      "amount": 300000,
+      "date": "2026-08-30",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:44:01.087Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005029215-hopg",
+      "type": "ingreso",
+      "amount": 45000,
+      "date": "2026-07-30",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:43:49.215Z"
+    },
+    {
+      "id": "tx-abono-pay-1794005016732-ourn",
+      "type": "ingreso",
+      "amount": 100000,
+      "date": "2026-06-30",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:43:36.732Z"
+    },
+    {
+      "id": "tx-loan-loan-1794004959836-u1n8",
+      "type": "egreso",
+      "amount": 1229900,
+      "date": "2026-06-15",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a Jhon Daza (Scooter)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004959836-u1n8",
+      "createdAt": "2026-11-06T22:42:39.836Z"
+    },
+    {
+      "id": "tx-loan-loan-1794004887636-6cgt",
+      "type": "egreso",
+      "amount": 300000,
+      "date": "2026-05-22",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a SALOME (Trabajo)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004887636-6cgt",
+      "createdAt": "2026-11-06T22:41:27.636Z"
+    },
+    {
+      "id": "tx-abono-pay-1794004828691-aa6v",
+      "type": "ingreso",
+      "amount": 200000,
+      "date": "2026-06-15",
+      "category": "Abono Préstamo a Tercero",
+      "description": "Abono de Jhon Daza (Apoyo post viaje)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004805920-44h0",
+      "createdAt": "2026-11-06T22:40:28.692Z"
+    },
+    {
+      "id": "tx-loan-loan-1794004805920-44h0",
+      "type": "egreso",
+      "amount": 200000,
+      "date": "2026-05-20",
+      "category": "Préstamo Entregado a Tercero",
+      "description": "Préstamo entregado a Jhon Daza (Apoyo post viaje)",
+      "paymentMethod": "Transferencia",
+      "relatedLoanId": "loan-1794004805920-44h0",
+      "createdAt": "2026-11-06T22:40:05.920Z"
+    }
+  ],
+  "loans": [
+    {
+      "borrowerName": "Jhon Daza",
+      "borrowerPhone": "3215852253",
+      "concept": "Xiaomi",
+      "initialAmount": 1151817,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-09-20",
+      "dueDate": "2027-09-20",
+      "id": "loan-1794005410724-n6bb",
+      "payments": [],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:50:10.724Z",
+      "updatedAt": "2026-11-06T22:50:10.724Z"
+    },
+    {
+      "borrowerName": "Jhon Daza",
+      "borrowerPhone": "3215852253",
+      "concept": "Xbox",
+      "initialAmount": 250000,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-08-20",
+      "dueDate": "2026-12-31",
+      "id": "loan-1794005282547-pdno",
+      "payments": [],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:48:02.547Z",
+      "updatedAt": "2026-11-06T22:48:02.547Z"
+    },
+    {
+      "borrowerName": "SALOME",
+      "borrowerPhone": "3502687019",
+      "concept": "Prestamo paseo",
+      "initialAmount": 100000,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-07-19",
+      "dueDate": "2026-12-31",
+      "id": "loan-1794005235350-57b1",
+      "payments": [],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:47:15.350Z",
+      "updatedAt": "2026-11-06T22:47:15.350Z"
+    },
+    {
+      "borrowerName": "Orbey Aguirre",
+      "borrowerPhone": "3245769640",
+      "concept": "Tecnico Mecanica",
+      "initialAmount": 280000,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-07-15",
+      "dueDate": "2026-12-31",
+      "id": "loan-1794005150150-ritp",
+      "payments": [
+        {
+          "amount": 100000,
+          "date": "2026-07-31",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005167351-15n9",
+          "loanId": "loan-1794005150150-ritp",
+          "createdAt": "2026-11-06T22:46:07.352Z"
+        },
+        {
+          "amount": 150000,
+          "date": "2026-08-31",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005178543-rooy",
+          "loanId": "loan-1794005150150-ritp",
+          "createdAt": "2026-11-06T22:46:18.543Z"
+        }
+      ],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:45:50.150Z",
+      "updatedAt": "2026-11-06T22:46:18.543Z"
+    },
+    {
+      "borrowerName": "Jhon Daza",
+      "borrowerPhone": "3215852253",
+      "concept": "Scooter",
+      "initialAmount": 1229900,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-06-15",
+      "dueDate": "2027-06-15",
+      "id": "loan-1794004959836-u1n8",
+      "payments": [
+        {
+          "amount": 100000,
+          "date": "2026-06-30",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005016732-ourn",
+          "loanId": "loan-1794004959836-u1n8",
+          "createdAt": "2026-11-06T22:43:36.732Z"
+        },
+        {
+          "amount": 45000,
+          "date": "2026-07-30",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005029215-hopg",
+          "loanId": "loan-1794004959836-u1n8",
+          "createdAt": "2026-11-06T22:43:49.215Z"
+        },
+        {
+          "amount": 300000,
+          "date": "2026-08-30",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005041087-f942",
+          "loanId": "loan-1794004959836-u1n8",
+          "createdAt": "2026-11-06T22:44:01.087Z"
+        },
+        {
+          "amount": 100000,
+          "date": "2026-09-30",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005052452-i4u5",
+          "loanId": "loan-1794004959836-u1n8",
+          "createdAt": "2026-11-06T22:44:12.452Z"
+        },
+        {
+          "amount": 70000,
+          "date": "2026-10-30",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794005067883-a507",
+          "loanId": "loan-1794004959836-u1n8",
+          "createdAt": "2026-11-06T22:44:27.883Z"
+        }
+      ],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:42:39.836Z",
+      "updatedAt": "2026-11-06T22:44:27.884Z"
+    },
+    {
+      "borrowerName": "SALOME",
+      "borrowerPhone": "3502687019",
+      "concept": "Trabajo",
+      "initialAmount": 300000,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-05-22",
+      "dueDate": "2026-12-31",
+      "id": "loan-1794004887636-6cgt",
+      "payments": [],
+      "status": "al_dia",
+      "createdAt": "2026-11-06T22:41:27.636Z",
+      "updatedAt": "2026-11-06T22:41:27.636Z"
+    },
+    {
+      "borrowerName": "Jhon Daza",
+      "borrowerPhone": "3215852253",
+      "concept": "Apoyo post viaje",
+      "initialAmount": 200000,
+      "monthlyInterestRate": 0,
+      "startDate": "2026-05-20",
+      "dueDate": "2026-06-20",
+      "id": "loan-1794004805920-44h0",
+      "payments": [
+        {
+          "amount": 200000,
+          "date": "2026-06-15",
+          "paymentMethod": "Transferencia",
+          "id": "pay-1794004828691-aa6v",
+          "loanId": "loan-1794004805920-44h0",
+          "createdAt": "2026-11-06T22:40:28.691Z"
+        }
+      ],
+      "status": "pagado",
+      "createdAt": "2026-11-06T22:40:05.920Z",
+      "updatedAt": "2026-11-06T22:40:28.692Z"
+    }
+  ],
+  "debts": [
+    {
+      "creditor": "BBVA",
+      "concept": "Credito",
+      "originalAmount": 5000000,
+      "currentBalance": 4131336,
+      "monthlyPayment": 144730,
+      "cutoffDay": 30,
+      "paymentDay": 17,
+      "rateType": "ea",
+      "enteredRate": 25.17,
+      "id": "debt-1794013435076-kbmv",
+      "effectiveAnnualRate": 25.17,
+      "monthlyRate": 1.8885,
+      "nominalAnnualRate": 22.66,
+      "estimatedMonthlyInterest": 78019,
+      "payments": [
+        {
+          "amount": 144730,
+          "date": "2026-11-07",
+          "principalAmount": 61685,
+          "interestAmount": 83045,
+          "id": "dpay-1794014433116-okq3",
+          "debtId": "debt-1794013435076-kbmv",
+          "createdAt": "2026-11-07T01:20:33.116Z"
+        }
+      ],
+      "status": "al_dia",
+      "createdAt": "2026-11-07T01:03:55.076Z",
+      "updatedAt": "2026-11-07T01:20:33.116Z"
+    },
+    {
+      "creditor": "NU",
+      "concept": "Tarjeta de credito",
+      "originalAmount": 7790632,
+      "currentBalance": 6082082,
+      "monthlyPayment": 1841703,
+      "cutoffDay": 20,
+      "paymentDay": 10,
+      "rateType": "ea",
+      "enteredRate": 27.9,
+      "id": "debt-1794013314949-ywbg",
+      "effectiveAnnualRate": 27.9,
+      "monthlyRate": 2.0718,
+      "nominalAnnualRate": 24.86,
+      "estimatedMonthlyInterest": 126010,
+      "payments": [
+        {
+          "amount": 1841703,
+          "date": "2026-11-07",
+          "principalAmount": 1708550,
+          "interestAmount": 133153,
+          "id": "dpay-1794014686687-nuvl",
+          "debtId": "debt-1794013314949-ywbg",
+          "createdAt": "2026-11-07T01:24:46.687Z"
+        }
+      ],
+      "status": "al_dia",
+      "createdAt": "2026-11-07T01:01:54.949Z",
+      "updatedAt": "2026-11-07T01:24:46.687Z"
+    },
+    {
+      "creditor": "Nequi",
+      "concept": "Credito",
+      "originalAmount": 5000000,
+      "currentBalance": 3600060,
+      "monthlyPayment": 222257,
+      "cutoffDay": 30,
+      "paymentDay": 19,
+      "rateType": "ea",
+      "enteredRate": 34.49,
+      "id": "debt-1794013161808-2rxa",
+      "effectiveAnnualRate": 34.49,
+      "monthlyRate": 2.5001,
+      "nominalAnnualRate": 30,
+      "estimatedMonthlyInterest": 90004,
+      "payments": [],
+      "status": "al_dia",
+      "createdAt": "2026-11-07T00:59:21.808Z",
+      "updatedAt": "2026-11-07T00:59:21.808Z"
+    },
+    {
+      "creditor": "Addi Shop",
+      "concept": "Credito",
+      "originalAmount": 2521860,
+      "currentBalance": 613591,
+      "monthlyPayment": 413328,
+      "cutoffDay": 30,
+      "paymentDay": 23,
+      "rateType": "ea",
+      "enteredRate": 50,
+      "id": "debt-1794012793385-55ti",
+      "effectiveAnnualRate": 50,
+      "monthlyRate": 3.4366,
+      "nominalAnnualRate": 41.24,
+      "estimatedMonthlyInterest": 21087,
+      "payments": [
+        {
+          "amount": 413328,
+          "date": "2026-11-07",
+          "principalAmount": 331878,
+          "interestAmount": 81450,
+          "id": "dpay-1794014143113-gj15",
+          "debtId": "debt-1794012793385-55ti",
+          "createdAt": "2026-11-07T01:15:43.113Z"
+        }
+      ],
+      "status": "al_dia",
+      "createdAt": "2026-11-07T00:53:13.385Z",
+      "updatedAt": "2026-11-07T01:15:43.113Z"
+    }
+  ]
+}

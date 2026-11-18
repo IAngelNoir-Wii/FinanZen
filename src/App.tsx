@@ -19,6 +19,9 @@ import {
   UploadCloud,
   Sparkles,
   X,
+  CheckCircle2,
+  AlertCircle,
+  FileUp,
 } from 'lucide-react';
 
 type NavTab = 'resumen' | 'transacciones' | 'prestamos' | 'deudas' | 'reportes';
@@ -48,12 +51,56 @@ function MainApp() {
   const [selectedDebtId, setSelectedDebtId] = useState<string | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialType, setQuickAddInitialType] = useState<
     'ingreso' | 'egreso' | 'prestamo' | 'deuda'
   >('ingreso');
+
+  const handleBackupFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFeedback(null);
+    setIsImportingBackup(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (!text) {
+          setImportFeedback({
+            type: 'error',
+            message: 'El archivo seleccionado está vacío.',
+          });
+          return;
+        }
+        const result = await importBackup(text);
+        setImportFeedback({
+          type: result.success ? 'success' : 'error',
+          message: result.message,
+        });
+        if (result.success) {
+          setOnboardingDismissed(true);
+        }
+      } finally {
+        setIsImportingBackup(false);
+      }
+    };
+    reader.onerror = () => {
+      setIsImportingBackup(false);
+      setImportFeedback({
+        type: 'error',
+        message: 'No se pudo leer el archivo desde tu dispositivo.',
+      });
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
 
   // Show AuthGate if not authenticated and not explicitly in local mode
   if (!user && !localModeBypassed) {
@@ -288,6 +335,34 @@ function MainApp() {
           </div>
         )}
 
+        {/* Import Backup Feedback Banner */}
+        {importFeedback && (
+          <div
+            role="status"
+            className={`rounded-2xl p-4 border flex items-start justify-between gap-3 ${
+              importFeedback.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            <div className="flex items-start gap-2.5 text-xs">
+              {importFeedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <span className="font-medium leading-relaxed">{importFeedback.message}</span>
+            </div>
+            <button
+              onClick={() => setImportFeedback(null)}
+              className="p-1 opacity-60 hover:opacity-100 rounded cursor-pointer shrink-0"
+              aria-label="Cerrar mensaje"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* First-Time Cloud Onboarding Card */}
         {isCloudEmpty && !onboardingDismissed && (
           <div className="bg-white border border-emerald-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
@@ -297,13 +372,13 @@ function MainApp() {
               </h2>
               <p className="text-xs text-slate-600">
                 Tu espacio de Firebase está listo y sincronizado en tiempo real. Puedes subir los datos
-                guardados en este navegador, cargar ejemplos para probar o empezar desde cero.
+                guardados en este navegador, importar una copia JSON, cargar ejemplos o empezar desde cero.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {hasLocalSavedData && (
                 <button
-                  disabled={isMigrating}
+                  disabled={isMigrating || isImportingBackup}
                   onClick={async () => {
                     setIsMigrating(true);
                     await migrateLocalDataToFirebase();
@@ -317,8 +392,24 @@ function MainApp() {
                 </button>
               )}
 
+              <label
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                  isImportingBackup ? 'opacity-60 pointer-events-none' : ''
+                }`}
+              >
+                <FileUp className="w-4 h-4 text-slate-600" />
+                <span>{isImportingBackup ? 'Importando...' : 'Importar copia (.json)'}</span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  disabled={isImportingBackup}
+                  onChange={handleBackupFileChange}
+                />
+              </label>
+
               <button
-                disabled={isMigrating}
+                disabled={isMigrating || isImportingBackup}
                 onClick={async () => {
                   setIsMigrating(true);
                   await resetData('seed');
@@ -422,32 +513,18 @@ function MainApp() {
               Exportar copia
             </button>
 
-            <label className="text-slate-600 hover:text-slate-900 transition-colors font-medium cursor-pointer">
-              <span>Importar copia</span>
+            <label
+              className={`text-slate-600 hover:text-slate-900 transition-colors font-medium cursor-pointer ${
+                isImportingBackup ? 'opacity-60 pointer-events-none' : ''
+              }`}
+            >
+              <span>{isImportingBackup ? 'Importando...' : 'Importar copia'}</span>
               <input
                 type="file"
-                accept=".json"
+                accept=".json,application/json"
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = async (event) => {
-                    const text = event.target?.result as string;
-                    if (text) {
-                      const success = await importBackup(text);
-                      if (success) {
-                        alert('¡Copia de seguridad restaurada exitosamente!');
-                      } else {
-                        alert(
-                          'Error al leer el archivo. Asegúrate de que sea un archivo JSON exportado por FinanZen.'
-                        );
-                      }
-                    }
-                  };
-                  reader.readAsText(file);
-                  e.target.value = '';
-                }}
+                disabled={isImportingBackup}
+                onChange={handleBackupFileChange}
               />
             </label>
 

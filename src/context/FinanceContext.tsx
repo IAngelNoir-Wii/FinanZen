@@ -10,6 +10,7 @@ import {
   query,
   where,
   setDoc,
+  getDoc,
   updateDoc,
   deleteDoc,
   writeBatch,
@@ -17,6 +18,8 @@ import {
   deleteField,
   Timestamp,
   getDocs,
+  DocumentReference,
+  WriteBatch,
 } from 'firebase/firestore';
 import {
   FinanceData,
@@ -113,7 +116,17 @@ interface FinanceContextType {
   setCurrency: (currency: string) => void;
   triggerManualSync: () => Promise<void>;
   exportBackup: () => void;
-  importBackup: (jsonString: string) => Promise<boolean>;
+  importBackup: (jsonString: string) => Promise<ImportBackupResult>;
+}
+
+export interface ImportBackupResult {
+  success: boolean;
+  message: string;
+  counts?: {
+    transactions: number;
+    loans: number;
+    debts: number;
+  };
 }
 
 const LOCAL_STORAGE_KEY = 'finanzen_local_cache_v1';
@@ -495,6 +508,21 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const writeSnapshotToFirestore = useCallback(
     async (uid: string, source: FinanceData, clearExistingFirst = false) => {
       setIsSyncing(true);
+      const BATCH_LIMIT = 400;
+
+      const commitSetChunks = async (
+        ops: Array<{ ref: DocumentReference; data: Record<string, unknown> }>
+      ) => {
+        for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+          const batch: WriteBatch = writeBatch(db);
+          const slice = ops.slice(i, i + BATCH_LIMIT);
+          for (const op of slice) {
+            batch.set(op.ref, op.data);
+          }
+          await batch.commit();
+        }
+      };
+
       try {
         if (clearExistingFirst) {
           const subCols = ['loanPayments', 'debtPayments', 'transactions', 'loans', 'debts'];
@@ -503,40 +531,78 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
               query(collection(db, 'users', uid, colName), where('ownerId', '==', uid))
             );
             if (!snap.empty) {
-              const delBatch = writeBatch(db);
-              snap.docs.forEach((d) => delBatch.delete(d.ref));
-              await delBatch.commit();
+              for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+                const delBatch = writeBatch(db);
+                snap.docs.slice(i, i + BATCH_LIMIT).forEach((d) => delBatch.delete(d.ref));
+                await delBatch.commit();
+              }
             }
           }
         }
 
-        // 1. Ensure user profile doc exists first
-        await setDoc(doc(db, 'users', uid), {
-          ownerId: uid,
-          currency: ['COP', 'USD', 'EUR', 'MXN'].includes(source.currency) ? source.currency : 'COP',
-          incomeCategories: (source.incomeCategories || defaultIncomeCategories)
-            .slice(0, 50)
-            .map((c) => truncateStr(c, 100))
-            .filter(Boolean),
-          expenseCategories: (source.expenseCategories || defaultExpenseCategories)
-            .slice(0, 50)
-            .map((c) => truncateStr(c, 100))
-            .filter(Boolean),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
+        // Merge any custom categories used in transactions into category lists
+        const txList = Array.isArray(source.transactions) ? source.transactions : [];
+        const baseIncomeCats = Array.isArray(source.incomeCategories)
+          ? source.incomeCategories
+          : defaultIncomeCategories;
+        const baseExpenseCats = Array.isArray(source.expenseCategories)
+          ? source.expenseCategories
+          : defaultExpenseCategories;
+
+        const extraIncomeCats = txList
+          .filter((t) => t?.type === 'ingreso' && t?.category)
+          .map((t) => truncateStr(t.category, 100));
+        const extraExpenseCats = txList
+          .filter((t) => t?.type !== 'ingreso' && t?.category)
+          .map((t) => truncateStr(t.category, 100));
+
+        const cleanIncomeCategories = Array.from(
+          new Set([...baseIncomeCats.map((c) => truncateStr(c, 100)), ...extraIncomeCats].filter(Boolean))
+        ).slice(0, 50);
+        const cleanExpenseCategories = Array.from(
+          new Set([...baseExpenseCats.map((c) => truncateStr(c, 100)), ...extraExpenseCats].filter(Boolean))
+        ).slice(0, 50);
+
+        const cleanCurrency = ['COP', 'USD', 'EUR', 'MXN'].includes(source.currency)
+          ? source.currency
+          : 'COP';
+
+        // 1. Create or update user profile doc without overwriting immutable createdAt/ownerId
+        const userRef = doc(db, 'users', uid);
+        const existingUserSnap = await getDoc(userRef);
+        if (existingUserSnap.exists()) {
+          await updateDoc(userRef, {
+            currency: cleanCurrency,
+            incomeCategories: cleanIncomeCategories,
+            expenseCategories: cleanExpenseCategories,
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          await setDoc(userRef, {
+            ownerId: uid,
+            currency: cleanCurrency,
+            incomeCategories: cleanIncomeCategories,
+            expenseCategories: cleanExpenseCategories,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        }
 
         // 2. Write parent loans, debts, and transactions
-        const batch1 = writeBatch(db);
+        const parentOps: Array<{ ref: DocumentReference; data: Record<string, unknown> }> = [];
         const loanIdMap = new Map<string, string>();
         const debtIdMap = new Map<string, string>();
 
         for (const loan of source.loans || []) {
           const safeId = generateSafeId('loan');
-          loanIdMap.set(loan.id, safeId);
-          batch1.set(
-            doc(db, 'users', uid, 'loans', safeId),
-            stripUndefined({
+          if (loan.id) {
+            loanIdMap.set(loan.id, safeId);
+          }
+          const startDate = normalizeDateStr(loan.startDate);
+          const dueDate = normalizeDateStr(loan.dueDate || startDate);
+          parentOps.push({
+            ref: doc(db, 'users', uid, 'loans', safeId),
+            data: stripUndefined({
               ownerId: uid,
               borrowerName: truncateStr(loan.borrowerName, 120) || 'Deudor',
               borrowerPhone: loan.borrowerPhone ? truncateStr(loan.borrowerPhone, 30) : undefined,
@@ -544,35 +610,40 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
               concept: truncateStr(loan.concept, 300) || 'Préstamo personal',
               initialAmount: Math.max(1, Number(loan.initialAmount) || 1),
               monthlyInterestRate: Math.max(0, Number(loan.monthlyInterestRate) || 0),
-              startDate: normalizeDateStr(loan.startDate),
-              dueDate: normalizeDateStr(loan.dueDate),
+              startDate,
+              dueDate,
               notes: loan.notes ? truncateStr(loan.notes, 500) : undefined,
               status: ['al_dia', 'proximo', 'vencido', 'pagado'].includes(loan.status)
                 ? loan.status
                 : 'al_dia',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            })
-          );
+            }),
+          });
         }
 
         for (const debt of source.debts || []) {
           const safeId = generateSafeId('debt');
-          debtIdMap.set(debt.id, safeId);
-          const rates = calculateAllRates(debt.rateType || 'ea', debt.enteredRate || 0, debt.currentBalance || 0);
-          batch1.set(
-            doc(db, 'users', uid, 'debts', safeId),
-            stripUndefined({
+          if (debt.id) {
+            debtIdMap.set(debt.id, safeId);
+          }
+          const rateType = ['ea', 'mv', 'namv'].includes(debt.rateType) ? debt.rateType : 'ea';
+          const enteredRate = Math.max(0, Number(debt.enteredRate) || 0);
+          const currentBalance = Math.max(0, Number(debt.currentBalance) || 0);
+          const rates = calculateAllRates(rateType, enteredRate, currentBalance);
+          parentOps.push({
+            ref: doc(db, 'users', uid, 'debts', safeId),
+            data: stripUndefined({
               ownerId: uid,
               creditor: truncateStr(debt.creditor, 120) || 'Entidad',
               concept: truncateStr(debt.concept, 300) || 'Crédito',
               originalAmount: Math.max(1, Number(debt.originalAmount) || 1),
-              currentBalance: Math.max(0, Number(debt.currentBalance) || 0),
+              currentBalance,
               monthlyPayment: Math.max(0, Number(debt.monthlyPayment) || 0),
               cutoffDay: Math.min(31, Math.max(1, Number(debt.cutoffDay) || 15)),
               paymentDay: Math.min(31, Math.max(1, Number(debt.paymentDay) || 5)),
-              rateType: ['ea', 'mv', 'namv'].includes(debt.rateType) ? debt.rateType : 'ea',
-              enteredRate: Math.max(0, Number(debt.enteredRate) || 0),
+              rateType,
+              enteredRate,
               effectiveAnnualRate: rates.effectiveAnnualRate,
               monthlyRate: rates.monthlyRate,
               nominalAnnualRate: rates.nominalAnnualRate,
@@ -583,15 +654,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
               notes: debt.notes ? truncateStr(debt.notes, 500) : undefined,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            })
-          );
+            }),
+          });
         }
 
-        for (const tx of source.transactions || []) {
+        for (const tx of txList) {
           const safeId = generateSafeId('tx');
-          batch1.set(
-            doc(db, 'users', uid, 'transactions', safeId),
-            stripUndefined({
+          parentOps.push({
+            ref: doc(db, 'users', uid, 'transactions', safeId),
+            data: stripUndefined({
               ownerId: uid,
               type: tx.type === 'ingreso' ? 'ingreso' : 'egreso',
               amount: Math.max(1, Number(tx.amount) || 1),
@@ -605,24 +676,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
               notes: tx.notes ? truncateStr(tx.notes, 500) : undefined,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            })
-          );
+            }),
+          });
         }
 
-        await batch1.commit();
+        if (parentOps.length > 0) {
+          await commitSetChunks(parentOps);
+        }
 
         // 3. Write child payments referencing the newly created loan/debt IDs
-        const batch2 = writeBatch(db);
-        let hasPayments = false;
+        const childOps: Array<{ ref: DocumentReference; data: Record<string, unknown> }> = [];
 
         for (const loan of source.loans || []) {
           const mappedLoanId = loanIdMap.get(loan.id);
           if (!mappedLoanId) continue;
           for (const p of loan.payments || []) {
-            hasPayments = true;
-            batch2.set(
-              doc(db, 'users', uid, 'loanPayments', generateSafeId('pay')),
-              stripUndefined({
+            childOps.push({
+              ref: doc(db, 'users', uid, 'loanPayments', generateSafeId('pay')),
+              data: stripUndefined({
                 ownerId: uid,
                 loanId: mappedLoanId,
                 amount: Math.max(1, Number(p.amount) || 1),
@@ -630,8 +701,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                 paymentMethod: truncateStr(p.paymentMethod, 60) || 'Transferencia',
                 notes: p.notes ? truncateStr(p.notes, 500) : undefined,
                 createdAt: serverTimestamp(),
-              })
-            );
+              }),
+            });
           }
         }
 
@@ -639,10 +710,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
           const mappedDebtId = debtIdMap.get(debt.id);
           if (!mappedDebtId) continue;
           for (const p of debt.payments || []) {
-            hasPayments = true;
-            batch2.set(
-              doc(db, 'users', uid, 'debtPayments', generateSafeId('dpay')),
-              stripUndefined({
+            childOps.push({
+              ref: doc(db, 'users', uid, 'debtPayments', generateSafeId('dpay')),
+              data: stripUndefined({
                 ownerId: uid,
                 debtId: mappedDebtId,
                 amount: Math.max(1, Number(p.amount) || 1),
@@ -653,13 +723,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                   p.interestAmount !== undefined ? Math.max(0, Number(p.interestAmount)) : undefined,
                 notes: p.notes ? truncateStr(p.notes, 500) : undefined,
                 createdAt: serverTimestamp(),
-              })
-            );
+              }),
+            });
           }
         }
 
-        if (hasPayments) {
-          await batch2.commit();
+        if (childOps.length > 0) {
+          await commitSetChunks(childOps);
         }
 
         setLastSyncTime(new Date());
@@ -1531,26 +1601,107 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const importBackup = async (jsonString: string): Promise<boolean> => {
+  const importBackup = async (jsonString: string): Promise<ImportBackupResult> => {
     try {
-      const parsed = JSON.parse(jsonString);
+      const cleanedJson = jsonString.replace(/^\uFEFF/, '').trim();
+      const rawParsed = JSON.parse(cleanedJson);
+      const parsed =
+        rawParsed && typeof rawParsed === 'object' && rawParsed.data && !rawParsed.transactions
+          ? rawParsed.data
+          : rawParsed;
+
       if (
-        parsed &&
-        Array.isArray(parsed.transactions) &&
-        Array.isArray(parsed.loans) &&
-        Array.isArray(parsed.debts)
+        !parsed ||
+        typeof parsed !== 'object' ||
+        !Array.isArray(parsed.transactions) ||
+        !Array.isArray(parsed.loans) ||
+        !Array.isArray(parsed.debts)
       ) {
-        if (user) {
-          await writeSnapshotToFirestore(user.uid, parsed, true);
-        } else {
-          saveLocalData(parsed);
-        }
-        return true;
+        return {
+          success: false,
+          message:
+            'El archivo JSON no tiene el formato esperado de FinanZen (debe incluir transactions, loans y debts).',
+        };
       }
-      return false;
+
+      const txList: Transaction[] = parsed.transactions;
+      const loanList: ThirdPartyLoan[] = parsed.loans;
+      const debtList: OwnDebt[] = parsed.debts;
+
+      const baseIncomeCats: string[] = Array.isArray(parsed.incomeCategories)
+        ? parsed.incomeCategories
+        : defaultIncomeCategories;
+      const baseExpenseCats: string[] = Array.isArray(parsed.expenseCategories)
+        ? parsed.expenseCategories
+        : defaultExpenseCategories;
+
+      const mergedIncomeCats = Array.from(
+        new Set(
+          [
+            ...baseIncomeCats.map((c) => truncateStr(c, 100)),
+            ...txList.filter((t) => t?.type === 'ingreso').map((t) => truncateStr(t.category, 100)),
+          ].filter(Boolean)
+        )
+      ).slice(0, 50);
+
+      const mergedExpenseCats = Array.from(
+        new Set(
+          [
+            ...baseExpenseCats.map((c) => truncateStr(c, 100)),
+            ...txList.filter((t) => t?.type !== 'ingreso').map((t) => truncateStr(t.category, 100)),
+          ].filter(Boolean)
+        )
+      ).slice(0, 50);
+
+      const normalizedSnapshot: FinanceData = {
+        version: Number(parsed.version) || 1,
+        lastUpdated:
+          typeof parsed.lastUpdated === 'string' ? parsed.lastUpdated : new Date().toISOString(),
+        currency: ['COP', 'USD', 'EUR', 'MXN'].includes(parsed.currency) ? parsed.currency : 'COP',
+        incomeCategories: mergedIncomeCats.length > 0 ? mergedIncomeCats : defaultIncomeCategories,
+        expenseCategories:
+          mergedExpenseCats.length > 0 ? mergedExpenseCats : defaultExpenseCategories,
+        transactions: txList,
+        loans: loanList,
+        debts: debtList,
+      };
+
+      if (user) {
+        await writeSnapshotToFirestore(user.uid, normalizedSnapshot, true);
+      } else {
+        saveLocalData(normalizedSnapshot);
+      }
+
+      const counts = {
+        transactions: txList.length,
+        loans: loanList.length,
+        debts: debtList.length,
+      };
+
+      return {
+        success: true,
+        message: `¡Copia de seguridad restaurada! Se importaron ${counts.transactions} movimientos, ${counts.loans} préstamos y ${counts.debts} deudas.`,
+        counts,
+      };
     } catch (err) {
       console.error('Error al importar copia de seguridad:', err);
-      return false;
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      let friendlyMessage =
+        'No se pudo importar el archivo JSON. Verifica que sea una copia válida de FinanZen.';
+
+      if (err instanceof SyntaxError) {
+        friendlyMessage = 'El archivo no es un JSON válido (error de sintaxis al leer el archivo).';
+      } else if (rawMessage.includes('PERMISSION_DENIED') || rawMessage.includes('permission')) {
+        friendlyMessage =
+          'No se pudieron guardar los datos en Firebase por permisos. Verifica que hayas iniciado sesión con tu cuenta de Google verificada.';
+      } else if (rawMessage.includes('Quota exceeded')) {
+        friendlyMessage = 'Se alcanzó el límite diario gratuito de Firebase Firestore. Intenta mañana.';
+      }
+
+      return {
+        success: false,
+        message: friendlyMessage,
+      };
     }
   };
 
