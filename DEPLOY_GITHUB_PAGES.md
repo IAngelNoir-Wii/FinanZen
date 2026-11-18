@@ -1,55 +1,38 @@
-# Guía: Cómo desplegar FinanZen en GitHub Pages
+# Guía: Cómo desplegar FinanZen con Firebase en GitHub Pages
 
-Para publicar tu aplicación en GitHub Pages de forma gratuita y accesible desde cualquier navegador, sigue estos sencillos pasos:
+Tu aplicación ahora está conectada con **Firebase Auth (Google)** y **Cloud Firestore en tiempo real**, por lo que funciona directamente en GitHub Pages sin necesitar servidor propio y sincroniza tus datos en cualquier dispositivo.
 
 ---
 
-### Paso 1: Configuración en GitHub
+### Paso 1: Autorizar tu dominio de GitHub Pages en Firebase
+
+Para que el botón **"Continuar con Google"** funcione desde tu URL pública de GitHub Pages:
+
+1. Entra a [Firebase Console](https://console.firebase.google.com/) y abre tu proyecto (`asymmetric-surfer-491ww`).
+2. En el menú izquierdo ve a **Build** → **Authentication** → pestaña **Settings** → **Authorized domains**.
+3. Haz clic en **Add domain** y agrega tu dominio de GitHub Pages (solo el host, sin `https://` ni rutas), por ejemplo:
+   `iangelnoir-wii.github.io`
+4. Guarda los cambios.
+
+---
+
+### Paso 2: Configuración de Pages en GitHub
 
 1. Entra a tu repositorio en **GitHub**.
-2. Ve a la pestaña **Settings** (Configuración) del repositorio.
-3. En el menú lateral izquierdo, haz clic en **Pages**.
-4. En la sección **Build and deployment**:
-   - **Source**: Selecciona **GitHub Actions**.
-
-*(¡Listo! No tienes que configurar ramas manuales `gh-pages`; el flujo de trabajo automático que hemos creado se encargará de todo).*
+2. Ve a **Settings** → **Pages**.
+3. En **Build and deployment** → **Source**, selecciona **GitHub Actions**.
 
 ---
 
-### Paso 2: Subir el código a GitHub
+### Paso 3: Subir el código actualizado a GitHub
 
-En tu terminal local o entorno de Git, ejecuta:
+Ejecuta en tu terminal:
 
 ```bash
-# 1. Agrega todos los archivos
 git add .
-
-# 2. Crea el commit
-git commit -m "Configurar despliegue automático en GitHub Pages"
-
-# 3. Sube los cambios a la rama principal (main o master)
+git commit -m "Vincular Firebase Auth y Firestore en tiempo real"
 git push origin main
 ```
 
----
-
-### Paso 3: Visualizar tu aplicación
-
-1. En tu repositorio de GitHub, ve a la pestaña **Actions**.
-2. Verás el flujo de trabajo llamado **Deploy to GitHub Pages** ejecutándose. Tarda aproximadamente 1 minuto.
-3. Una vez terminado con un visto verde (✅), en la misma pestaña o en **Settings -> Pages** verás tu enlace público:
-   `https://<tu-usuario>.github.io/<nombre-del-repositorio>/`
-
----
-
-### ¿Cómo funciona el almacenamiento en GitHub Pages?
-- **GitHub Pages es un alojamiento estático**: La aplicación funciona al 100% en el navegador utilizando **LocalStorage** (almacenamiento local seguro en tu dispositivo).
-- **Copia de seguridad (Exportar / Importar)**:
-  - En el pie de página de la aplicación encontrarás los botones **"Exportar copia"** e **"Importar copia"**.
-  - Puedes descargar tu archivo JSON de respaldo en cualquier momento y transferirlo a otro celular, tableta o computador con un solo clic.
-
----
-
-### Configuración técnica ya preparada en el código:
-- **`vite.config.ts`**: Ya tiene configurado `base: './'` para que todos los scripts, estilos y fuentes carguen correctamente sin importar el nombre del repositorio o subcarpeta.
-- **`.github/workflows/deploy.yml`**: Flujo automático que compila (`npm run build`) y publica la carpeta `dist/` en GitHub Pages en cada push.
+1. En la pestaña **Actions** de GitHub verás el flujo **Deploy to GitHub Pages** ejecutarse automáticamente (~1 minuto).
+2. Al finalizar en verde (✅), abre tu enlace público `https://<tu-usuario>.github.io/<repositorio>/` e inicia sesión con tu cuenta de correo de Google para ver y editar tus datos en tiempo real desde cualquier dispositivo.

@@ -1,0 +1,306 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==================== GLOBAL HARDENED HELPERS ====================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isEmailVerified() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    function isValidIsoDate(d) {
+      return d is string && d.size() == 10 && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidCategoryList(listVal) {
+      return listVal is list
+        && listVal.size() <= 50
+        && (
+          listVal.size() == 0 ||
+          (listVal[0] is string && listVal[0].size() >= 1 && listVal[0].size() <= 100)
+        );
+    }
+
+    function hasValidParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.ownerId == request.auth.uid;
+    }
+
+    // ==================== VALIDATION BLUEPRINTS ====================
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['ownerId', 'currency', 'incomeCategories', 'expenseCategories', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'currency', 'incomeCategories', 'expenseCategories', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.currency in ['COP', 'USD', 'EUR', 'MXN']
+        && isValidCategoryList(data.incomeCategories)
+        && isValidCategoryList(data.expenseCategories)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data, userId) {
+      return data.keys().hasAll(['ownerId', 'type', 'amount', 'date', 'category', 'description', 'paymentMethod', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'type', 'amount', 'date', 'category', 'description', 'paymentMethod', 'relatedLoanId', 'relatedDebtId', 'isRecurring', 'notes', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.type in ['ingreso', 'egreso']
+        && data.amount is number
+        && data.amount > 0
+        && isValidIsoDate(data.date)
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 100
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60
+        && (!('relatedLoanId' in data) || (data.relatedLoanId is string && isValidId(data.relatedLoanId)))
+        && (!('relatedDebtId' in data) || (data.relatedDebtId is string && isValidId(data.relatedDebtId)))
+        && (!('isRecurring' in data) || data.isRecurring is bool)
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidThirdPartyLoan(data, userId) {
+      return data.keys().hasAll(['ownerId', 'borrowerName', 'concept', 'initialAmount', 'monthlyInterestRate', 'startDate', 'dueDate', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'borrowerName', 'borrowerPhone', 'borrowerEmail', 'concept', 'initialAmount', 'monthlyInterestRate', 'startDate', 'dueDate', 'notes', 'status', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.borrowerName is string && data.borrowerName.size() >= 1 && data.borrowerName.size() <= 120
+        && (!('borrowerPhone' in data) || (data.borrowerPhone is string && data.borrowerPhone.size() <= 30))
+        && (!('borrowerEmail' in data) || (data.borrowerEmail is string && data.borrowerEmail.size() <= 150))
+        && data.concept is string && data.concept.size() >= 1 && data.concept.size() <= 300
+        && data.initialAmount is number && data.initialAmount > 0
+        && data.monthlyInterestRate is number && data.monthlyInterestRate >= 0
+        && isValidIsoDate(data.startDate)
+        && isValidIsoDate(data.dueDate)
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.status in ['al_dia', 'proximo', 'vencido', 'pagado']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLoanPayment(data, userId) {
+      return data.keys().hasAll(['ownerId', 'loanId', 'amount', 'date', 'paymentMethod', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'loanId', 'amount', 'date', 'paymentMethod', 'notes', 'createdAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.loanId is string && isValidId(data.loanId)
+        && data.amount is number && data.amount > 0
+        && isValidIsoDate(data.date)
+        && data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidOwnDebt(data, userId) {
+      return data.keys().hasAll(['ownerId', 'creditor', 'concept', 'originalAmount', 'currentBalance', 'monthlyPayment', 'cutoffDay', 'paymentDay', 'rateType', 'enteredRate', 'effectiveAnnualRate', 'monthlyRate', 'nominalAnnualRate', 'estimatedMonthlyInterest', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'creditor', 'concept', 'originalAmount', 'currentBalance', 'monthlyPayment', 'cutoffDay', 'paymentDay', 'rateType', 'enteredRate', 'effectiveAnnualRate', 'monthlyRate', 'nominalAnnualRate', 'estimatedMonthlyInterest', 'status', 'notes', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.creditor is string && data.creditor.size() >= 1 && data.creditor.size() <= 120
+        && data.concept is string && data.concept.size() >= 1 && data.concept.size() <= 300
+        && data.originalAmount is number && data.originalAmount > 0
+        && data.currentBalance is number && data.currentBalance >= 0
+        && data.monthlyPayment is number && data.monthlyPayment >= 0
+        && data.cutoffDay is number && data.cutoffDay >= 1 && data.cutoffDay <= 31
+        && data.paymentDay is number && data.paymentDay >= 1 && data.paymentDay <= 31
+        && data.rateType in ['ea', 'mv', 'namv']
+        && data.enteredRate is number && data.enteredRate >= 0
+        && data.effectiveAnnualRate is number && data.effectiveAnnualRate >= 0
+        && data.monthlyRate is number && data.monthlyRate >= 0
+        && data.nominalAnnualRate is number && data.nominalAnnualRate >= 0
+        && data.estimatedMonthlyInterest is number && data.estimatedMonthlyInterest >= 0
+        && data.status in ['al_dia', 'proximo', 'vencido', 'liquidado']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDebtPayment(data, userId) {
+      return data.keys().hasAll(['ownerId', 'debtId', 'amount', 'date', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'debtId', 'amount', 'date', 'principalAmount', 'interestAmount', 'notes', 'createdAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.debtId is string && isValidId(data.debtId)
+        && data.amount is number && data.amount > 0
+        && isValidIsoDate(data.date)
+        && (!('principalAmount' in data) || (data.principalAmount is number && data.principalAmount >= 0))
+        && (!('interestAmount' in data) || (data.interestAmount is number && data.interestAmount >= 0))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp;
+    }
+
+    // ==================== COLLECTION MATCH BLOCKS ====================
+
+    match /users/{userId} {
+      allow get: if isVerifiedOwner(userId);
+      allow list: if false;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['currency', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['incomeCategories', 'expenseCategories', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['currency', 'incomeCategories', 'expenseCategories', 'updatedAt'])
+        );
+
+      allow delete: if isVerifiedOwner(userId);
+
+      // Subcollection: Transactions
+      match /transactions/{transactionId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(transactionId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(transactionId)
+          && isValidTransaction(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentUser(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(transactionId)
+          && isValidTransaction(incoming(), userId)
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'date', 'category', 'description', 'paymentMethod', 'isRecurring', 'notes', 'updatedAt']);
+
+        allow delete: if isVerifiedOwner(userId) && isValidId(transactionId) && existing().ownerId == request.auth.uid;
+      }
+
+      // Subcollection: Third-Party Loans
+      match /loans/{loanId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(loanId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(loanId)
+          && isValidThirdPartyLoan(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentUser(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(loanId)
+          && isValidThirdPartyLoan(incoming(), userId)
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+            (existing().status != 'pagado' && incoming().diff(existing()).affectedKeys().hasOnly(['borrowerName', 'borrowerPhone', 'borrowerEmail', 'concept', 'initialAmount', 'monthlyInterestRate', 'startDate', 'dueDate', 'notes', 'status', 'updatedAt']))
+          );
+
+        allow delete: if isVerifiedOwner(userId) && isValidId(loanId) && existing().ownerId == request.auth.uid;
+      }
+
+      // Subcollection: Loan Payments (Abonos)
+      match /loanPayments/{paymentId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(paymentId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(paymentId)
+          && isValidLoanPayment(incoming(), userId)
+          && incoming().createdAt == request.time
+          && hasValidParentUser(userId)
+          && exists(/databases/$(database)/documents/users/$(userId)/loans/$(incoming().loanId));
+
+        allow update: if false;
+
+        allow delete: if isVerifiedOwner(userId) && isValidId(paymentId) && existing().ownerId == request.auth.uid;
+      }
+
+      // Subcollection: Own Debts
+      match /debts/{debtId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(debtId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(debtId)
+          && isValidOwnDebt(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentUser(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(debtId)
+          && isValidOwnDebt(incoming(), userId)
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['currentBalance', 'estimatedMonthlyInterest', 'status', 'updatedAt']) ||
+            (existing().status != 'liquidado' && incoming().diff(existing()).affectedKeys().hasOnly(['creditor', 'concept', 'originalAmount', 'currentBalance', 'monthlyPayment', 'cutoffDay', 'paymentDay', 'rateType', 'enteredRate', 'effectiveAnnualRate', 'monthlyRate', 'nominalAnnualRate', 'estimatedMonthlyInterest', 'status', 'notes', 'updatedAt']))
+          );
+
+        allow delete: if isVerifiedOwner(userId) && isValidId(debtId) && existing().ownerId == request.auth.uid;
+      }
+
+      // Subcollection: Debt Payments
+      match /debtPayments/{paymentId} {
+        allow get: if isVerifiedOwner(userId) && isValidId(paymentId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedOwner(userId) && existing().ownerId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(paymentId)
+          && isValidDebtPayment(incoming(), userId)
+          && incoming().createdAt == request.time
+          && hasValidParentUser(userId)
+          && exists(/databases/$(database)/documents/users/$(userId)/debts/$(incoming().debtId));
+
+        allow update: if false;
+
+        allow delete: if isVerifiedOwner(userId) && isValidId(paymentId) && existing().ownerId == request.auth.uid;
+      }
+    }
+  }
+}

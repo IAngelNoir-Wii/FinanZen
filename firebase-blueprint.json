@@ -1,0 +1,380 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Configuración financiera y categorías personalizadas del usuario propietario",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID de Firebase Auth del propietario"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["COP", "USD", "EUR", "MXN"],
+          "description": "Moneda principal de visualización"
+        },
+        "incomeCategories": {
+          "type": "array",
+          "description": "Lista de categorías de ingresos (máximo 50)"
+        },
+        "expenseCategories": {
+          "type": "array",
+          "description": "Lista de categorías de egresos (máximo 50)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de creación en servidor"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de última actualización en servidor"
+        }
+      },
+      "required": ["ownerId", "currency", "incomeCategories", "expenseCategories", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Registro individual de ingreso o egreso mensual",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID del propietario"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ingreso", "egreso"],
+          "description": "Tipo de movimiento"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Monto positivo de la transacción"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Fecha del movimiento en formato YYYY-MM-DD"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Grupo o categoría del movimiento"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Concepto o descripción"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Medio de pago utilizado"
+        },
+        "relatedLoanId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "ID opcional del préstamo relacionado"
+        },
+        "relatedDebtId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "ID opcional de la deuda relacionada"
+        },
+        "isRecurring": {
+          "type": "boolean",
+          "description": "Indica si es un movimiento recurrente"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Notas opcionales"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de creación en servidor"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Fecha de actualización en servidor"
+        }
+      },
+      "required": ["ownerId", "type", "amount", "date", "category", "description", "paymentMethod", "createdAt", "updatedAt"]
+    },
+    "ThirdPartyLoan": {
+      "title": "ThirdPartyLoan",
+      "description": "Cuenta personal de préstamo otorgado a un tercero",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "borrowerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "borrowerPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "borrowerEmail": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "initialAmount": {
+          "type": "number"
+        },
+        "monthlyInterestRate": {
+          "type": "number"
+        },
+        "startDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "dueDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": ["al_dia", "proximo", "vencido", "pagado"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "borrowerName", "concept", "initialAmount", "monthlyInterestRate", "startDate", "dueDate", "status", "createdAt", "updatedAt"]
+    },
+    "LoanPayment": {
+      "title": "LoanPayment",
+      "description": "Abono recibido de un préstamo a terceros",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "loanId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "loanId", "amount", "date", "paymentMethod", "createdAt"]
+    },
+    "OwnDebt": {
+      "title": "OwnDebt",
+      "description": "Deuda propia con entidad bancaria o tercero y tasas calculadas",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "creditor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "concept": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "originalAmount": {
+          "type": "number"
+        },
+        "currentBalance": {
+          "type": "number"
+        },
+        "monthlyPayment": {
+          "type": "number"
+        },
+        "cutoffDay": {
+          "type": "number"
+        },
+        "paymentDay": {
+          "type": "number"
+        },
+        "rateType": {
+          "type": "string",
+          "enum": ["ea", "mv", "namv"]
+        },
+        "enteredRate": {
+          "type": "number"
+        },
+        "effectiveAnnualRate": {
+          "type": "number"
+        },
+        "monthlyRate": {
+          "type": "number"
+        },
+        "nominalAnnualRate": {
+          "type": "number"
+        },
+        "estimatedMonthlyInterest": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["al_dia", "proximo", "vencido", "liquidado"]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId", "creditor", "concept", "originalAmount", "currentBalance",
+        "monthlyPayment", "cutoffDay", "paymentDay", "rateType", "enteredRate",
+        "effectiveAnnualRate", "monthlyRate", "nominalAnnualRate",
+        "estimatedMonthlyInterest", "status", "createdAt", "updatedAt"
+      ]
+    },
+    "DebtPayment": {
+      "title": "DebtPayment",
+      "description": "Pago o abono realizado a una deuda propia",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "debtId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "principalAmount": {
+          "type": "number"
+        },
+        "interestAmount": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "debtId", "amount", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Documento raíz de configuración financiera y categorías del usuario"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Ingresos y egresos del usuario"
+    },
+    "/users/{userId}/loans/{loanId}": {
+      "schema": { "$ref": "#/entities/ThirdPartyLoan" },
+      "description": "Préstamos otorgados a terceros por el usuario"
+    },
+    "/users/{userId}/loanPayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/LoanPayment" },
+      "description": "Abonos recibidos de préstamos a terceros"
+    },
+    "/users/{userId}/debts/{debtId}": {
+      "schema": { "$ref": "#/entities/OwnDebt" },
+      "description": "Deudas propias del usuario con bancos o terceros"
+    },
+    "/users/{userId}/debtPayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/DebtPayment" },
+      "description": "Pagos de cuotas realizados a deudas propias"
+    }
+  }
+}
