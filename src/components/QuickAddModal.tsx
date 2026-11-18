@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { TransactionType, RateInputType } from '../types/finance';
-import { calculateAllRates, formatCurrency } from '../utils/financialCalculations';
+import { calculateAllRates, formatCurrency, groupLoansByBorrower } from '../utils/financialCalculations';
 import {
   X,
   ArrowDownLeft,
@@ -53,6 +53,19 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [debtEnteredRate, setDebtEnteredRate] = useState('24.5');
   const [debtCutoffDay, setDebtCutoffDay] = useState('18');
   const [debtPaymentDay, setDebtPaymentDay] = useState('5');
+
+  const borrowerGroups = useMemo(() => groupLoansByBorrower(data.loans), [data.loans]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialType);
+      if (initialType === 'egreso') {
+        setTxCategory(data.expenseCategories[0]);
+      } else if (initialType === 'ingreso') {
+        setTxCategory(data.incomeCategories[0]);
+      }
+    }
+  }, [isOpen, initialType, data.expenseCategories, data.incomeCategories]);
 
   if (!isOpen) return null;
 
@@ -255,11 +268,26 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
                 <input
                   type="text"
                   required
+                  list="quick-add-borrowers-list"
                   placeholder="Ej: Carlos Mendoza..."
                   value={borrowerName}
-                  onChange={(e) => setBorrowerName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBorrowerName(val);
+                    const match = borrowerGroups.find(
+                      (g) => g.borrowerKey === val.trim().toLowerCase()
+                    );
+                    if (match && match.borrowerPhone && !borrowerPhone) {
+                      setBorrowerPhone(match.borrowerPhone);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
                 />
+                <datalist id="quick-add-borrowers-list">
+                  {borrowerGroups.map((g) => (
+                    <option key={g.borrowerKey} value={g.borrowerName} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -265,6 +265,139 @@ export function generateWhatsAppReminderUrl(loan: ThirdPartyLoan): string {
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
+export interface BorrowerAccountGroup {
+  borrowerKey: string;
+  borrowerName: string;
+  borrowerPhone?: string;
+  borrowerEmail?: string;
+  loans: ThirdPartyLoan[];
+  activeLoansCount: number;
+  settledLoansCount: number;
+  totalLoaned: number;
+  totalPaid: number;
+  totalRemaining: number;
+  progressPercentage: number;
+  isFullySettled: boolean;
+  mostUrgentDueDate?: string;
+  minDaysRemaining: number | null;
+}
+
+/**
+ * Agrupa todos los préstamos por persona (normalizando el nombre),
+ * conservando tanto los préstamos pendientes como los ya pagados.
+ */
+export function groupLoansByBorrower(loans: ThirdPartyLoan[]): BorrowerAccountGroup[] {
+  const map = new Map<string, ThirdPartyLoan[]>();
+
+  for (const loan of loans) {
+    const key = (loan.borrowerName || 'Sin nombre').trim().toLowerCase();
+    const list = map.get(key) || [];
+    list.push(loan);
+    map.set(key, list);
+  }
+
+  const groups: BorrowerAccountGroup[] = [];
+
+  for (const [borrowerKey, groupLoans] of map.entries()) {
+    // Sort loans: active first (by dueDate asc), then settled (by startDate desc)
+    const sortedLoans = [...groupLoans].sort((a, b) => {
+      const aSettled = calculateLoanSummary(a).isSettled;
+      const bSettled = calculateLoanSummary(b).isSettled;
+      if (aSettled !== bSettled) return aSettled ? 1 : -1;
+      if (!aSettled) {
+        return (a.dueDate || '').localeCompare(b.dueDate || '');
+      }
+      return (b.startDate || '').localeCompare(a.startDate || '');
+    });
+
+    const latestWithPhone = sortedLoans.find((l) => l.borrowerPhone);
+    const latestWithEmail = sortedLoans.find((l) => l.borrowerEmail);
+    const displayName = sortedLoans[0]?.borrowerName.trim() || 'Sin nombre';
+
+    let totalLoaned = 0;
+    let totalPaid = 0;
+    let totalRemaining = 0;
+    let activeLoansCount = 0;
+    let settledLoansCount = 0;
+    let minDaysRemaining: number | null = null;
+    let mostUrgentDueDate: string | undefined;
+
+    for (const loan of sortedLoans) {
+      const summary = calculateLoanSummary(loan);
+      totalLoaned += Number(loan.initialAmount) || 0;
+      totalPaid += summary.totalPaid;
+      totalRemaining += summary.remainingBalance;
+
+      if (summary.isSettled) {
+        settledLoansCount += 1;
+      } else {
+        activeLoansCount += 1;
+        const days = getDaysDifference(loan.dueDate);
+        if (minDaysRemaining === null || days < minDaysRemaining) {
+          minDaysRemaining = days;
+          mostUrgentDueDate = loan.dueDate;
+        }
+      }
+    }
+
+    const progressPercentage =
+      totalLoaned > 0 ? Math.min(100, Math.round((totalPaid / totalLoaned) * 100)) : 100;
+
+    groups.push({
+      borrowerKey,
+      borrowerName: displayName,
+      borrowerPhone: latestWithPhone?.borrowerPhone,
+      borrowerEmail: latestWithEmail?.borrowerEmail,
+      loans: sortedLoans,
+      activeLoansCount,
+      settledLoansCount,
+      totalLoaned,
+      totalPaid,
+      totalRemaining,
+      progressPercentage,
+      isFullySettled: activeLoansCount === 0,
+      mostUrgentDueDate,
+      minDaysRemaining,
+    });
+  }
+
+  // Sort groups: people with pending/overdue loans first, then settled
+  return groups.sort((a, b) => {
+    if (a.isFullySettled !== b.isFullySettled) return a.isFullySettled ? 1 : -1;
+    if (!a.isFullySettled && a.minDaysRemaining !== null && b.minDaysRemaining !== null) {
+      return a.minDaysRemaining - b.minDaysRemaining;
+    }
+    return a.borrowerName.localeCompare(b.borrowerName);
+  });
+}
+
+export function generateConsolidatedWhatsAppUrl(
+  group: BorrowerAccountGroup,
+  currency: string = 'COP'
+): string {
+  if (!group.borrowerPhone) return '';
+  const days = group.minDaysRemaining;
+  const dueStr = group.mostUrgentDueDate ? formatDate(group.mostUrgentDueDate) : '';
+
+  let message = `Hola ${group.borrowerName}, espero te encuentres muy bien. `;
+  if (group.activeLoansCount > 1) {
+    message += `Te escribo para compartirte el resumen de tus ${group.activeLoansCount} préstamos activos, cuyo saldo pendiente total es de ${formatCurrency(group.totalRemaining, currency)}.`;
+    if (dueStr) {
+      message += ` El próximo vencimiento programado es el ${dueStr}.`;
+    }
+    message += ` Quedo atento/a, ¡muchas gracias!`;
+  } else if (days !== null && days < 0) {
+    message += `Te escribo para recordarte amablemente que el compromiso de pago acordado por valor de ${formatCurrency(group.totalRemaining, currency)} tenía fecha límite el ${dueStr}. ¿Cómo podríamos coordinar el pago? Quedo atento/a, muchas gracias.`;
+  } else if (days === 0) {
+    message += `Te escribo para recordarte que hoy ${dueStr} es la fecha programada para el pago acordado por valor de ${formatCurrency(group.totalRemaining, currency)}. Me confirmas por favor una vez realices el abono. ¡Muchas gracias!`;
+  } else {
+    message += `Te escribo para saludarte y recordarte con tiempo que el saldo pendiente es de ${formatCurrency(group.totalRemaining, currency)}${dueStr ? ` con fecha programada para el ${dueStr}` : ''}. Quedo atento/a a cualquier duda. ¡Feliz día!`;
+  }
+
+  const cleanPhone = group.borrowerPhone.replace(/[^0-9]/g, '');
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+
 /**
  * Genera tabla de simulación de amortización (Método Francés - Cuota fija)
  */
