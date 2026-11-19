@@ -7,6 +7,7 @@ export const defaultIncomeCategories = [
   'Comisiones / Ventas',
   'Rendimientos e Inversiones',
   'Abono Préstamo a Tercero',
+  'Adelanto / Avance Tarjeta',
   'Arriendos Recibidos',
   'Regalos y Otros Ingresos',
 ];
@@ -17,6 +18,7 @@ export const defaultExpenseCategories = [
   'Transporte y Gasolina',
   'Pago Cuota Deuda Propia',
   'Préstamo Entregado a Tercero',
+  'Comisiones y Servicios Bancarios',
   'Salud y Farmacia',
   'Educación y Capacitación',
   'Ocio y Restaurantes',

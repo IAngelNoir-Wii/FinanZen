@@ -110,6 +110,7 @@ interface FinanceContextType {
     registerInCashFlow?: boolean
   ) => void;
   deleteDebtPayment: (debtId: string, paymentId: string) => void;
+  addDebtCharge: (charge: DebtChargeInput) => Promise<void>;
 
   // Settings & Reset
   resetData: (mode?: 'seed' | 'clean') => Promise<void>;
@@ -117,6 +118,20 @@ interface FinanceContextType {
   triggerManualSync: () => Promise<void>;
   exportBackup: () => void;
   importBackup: (jsonString: string) => Promise<ImportBackupResult>;
+}
+
+export interface DebtChargeInput {
+  debtId: string;
+  mode: 'compra' | 'adelanto';
+  amount: number;
+  serviceFee?: number;
+  date: string;
+  description: string;
+  category?: string;
+  notes?: string;
+  registerInCashFlow?: boolean;
+  registerFeeInCashFlow?: boolean;
+  updateDebtBalance?: boolean;
 }
 
 export interface ImportBackupResult {
@@ -1537,6 +1552,229 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  const addDebtCharge = async (charge: DebtChargeInput) => {
+    const debt = data.debts.find((d) => d.id === charge.debtId);
+    if (!debt) return;
+
+    const principalAmount = Math.max(1, Number(charge.amount) || 1);
+    const feeAmount = Math.max(0, Number(charge.serviceFee) || 0);
+    const totalAddedToCard = principalAmount + feeAmount;
+    const shouldUpdateDebt = charge.updateDebtBalance !== false;
+    const shouldRegisterMain = charge.registerInCashFlow !== false;
+    const shouldRegisterFee = feeAmount > 0 && charge.registerFeeInCashFlow !== false;
+
+    const newBalance = shouldUpdateDebt
+      ? Math.max(0, (Number(debt.currentBalance) || 0) + totalAddedToCard)
+      : Number(debt.currentBalance) || 0;
+    const rates = calculateAllRates(debt.rateType, debt.enteredRate, newBalance);
+    const chargeDate = normalizeDateStr(charge.date);
+
+    const mainCategory =
+      charge.mode === 'adelanto'
+        ? truncateStr(charge.category || 'Adelanto / Avance Tarjeta', 100) ||
+          'Adelanto / Avance Tarjeta'
+        : truncateStr(charge.category || 'Imprevistos y Varios', 100) || 'Imprevistos y Varios';
+    const feeCategory = 'Comisiones y Servicios Bancarios';
+
+    const defaultDesc =
+      charge.mode === 'adelanto'
+        ? `Adelanto a cuenta desde ${debt.creditor}`
+        : `Compra con ${debt.creditor}`;
+    const mainDescription = truncateStr(charge.description || defaultDesc, 300) || defaultDesc;
+
+    const combinedNotes = [
+      charge.notes ? truncateStr(charge.notes, 350) : '',
+      charge.mode === 'adelanto'
+        ? `Avance cargado a ${debt.creditor}${feeAmount > 0 ? ` · Comisión servicio: ${feeAmount}` : ''}`
+        : feeAmount > 0 && !shouldRegisterFee
+          ? `Cargo en ${debt.creditor} (incluye comisión: ${feeAmount})`
+          : `Cargo en ${debt.creditor}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    if (user) {
+      const uid = user.uid;
+      const path = `users/${uid}/debts/${debt.id}`;
+      setIsSyncing(true);
+      try {
+        const batch = writeBatch(db);
+
+        if (shouldUpdateDebt) {
+          batch.update(doc(db, 'users', uid, 'debts', debt.id), {
+            currentBalance: newBalance,
+            estimatedMonthlyInterest: rates.estimatedMonthlyInterest,
+            status: newBalance > 0 ? (debt.status === 'liquidado' ? 'al_dia' : debt.status) : 'liquidado',
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        if (shouldRegisterMain) {
+          const txId = generateSafeId(charge.mode === 'adelanto' ? 'tx-adv' : 'tx-card');
+          const mainTxAmount =
+            charge.mode === 'compra' && feeAmount > 0 && !shouldRegisterFee
+              ? totalAddedToCard
+              : principalAmount;
+          batch.set(
+            doc(db, 'users', uid, 'transactions', txId),
+            stripUndefined({
+              ownerId: uid,
+              type: charge.mode === 'adelanto' ? 'ingreso' : 'egreso',
+              amount: mainTxAmount,
+              date: chargeDate,
+              category: mainCategory,
+              description: mainDescription,
+              paymentMethod: charge.mode === 'adelanto' ? 'Transferencia' : 'Tarjeta Crédito',
+              relatedDebtId: debt.id,
+              notes: combinedNotes ? truncateStr(combinedNotes, 500) : undefined,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            })
+          );
+        }
+
+        if (shouldRegisterFee) {
+          const feeTxId = generateSafeId('tx-fee');
+          batch.set(
+            doc(db, 'users', uid, 'transactions', feeTxId),
+            stripUndefined({
+              ownerId: uid,
+              type: 'egreso',
+              amount: feeAmount,
+              date: chargeDate,
+              category: feeCategory,
+              description: truncateStr(
+                `Comisión por servicio (${debt.creditor}): ${mainDescription}`,
+                300
+              ),
+              paymentMethod: 'Tarjeta Crédito',
+              relatedDebtId: debt.id,
+              notes: truncateStr(
+                `Comisión por ${charge.mode === 'adelanto' ? 'adelanto a cuenta' : 'uso de tarjeta'}`,
+                500
+              ),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            })
+          );
+        }
+
+        await batch.commit();
+
+        const profileUpdates: Record<string, unknown> = {};
+        if (
+          shouldRegisterMain &&
+          charge.mode === 'adelanto' &&
+          !data.incomeCategories.includes(mainCategory)
+        ) {
+          profileUpdates.incomeCategories = [...data.incomeCategories, mainCategory].slice(0, 50);
+        }
+        const nextExpenseCats = [...data.expenseCategories];
+        let expenseChanged = false;
+        if (
+          shouldRegisterMain &&
+          charge.mode === 'compra' &&
+          !nextExpenseCats.includes(mainCategory)
+        ) {
+          nextExpenseCats.push(mainCategory);
+          expenseChanged = true;
+        }
+        if (shouldRegisterFee && !nextExpenseCats.includes(feeCategory)) {
+          nextExpenseCats.push(feeCategory);
+          expenseChanged = true;
+        }
+        if (expenseChanged) {
+          profileUpdates.expenseCategories = nextExpenseCats.slice(0, 50);
+        }
+        if (Object.keys(profileUpdates).length > 0) {
+          profileUpdates.updatedAt = serverTimestamp();
+          await updateDoc(doc(db, 'users', uid), profileUpdates);
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      } finally {
+        setIsSyncing(false);
+      }
+      return;
+    }
+
+    const newTransactions: Transaction[] = [];
+    const nowIso = new Date().toISOString();
+
+    if (shouldRegisterFee) {
+      newTransactions.push({
+        id: generateSafeId('tx-fee'),
+        type: 'egreso',
+        amount: feeAmount,
+        date: chargeDate,
+        category: feeCategory,
+        description: truncateStr(`Comisión por servicio (${debt.creditor}): ${mainDescription}`, 300),
+        paymentMethod: 'Tarjeta Crédito',
+        relatedDebtId: debt.id,
+        notes: `Comisión por ${charge.mode === 'adelanto' ? 'adelanto a cuenta' : 'uso de tarjeta'}`,
+        createdAt: nowIso,
+      });
+    }
+
+    if (shouldRegisterMain) {
+      const mainTxAmount =
+        charge.mode === 'compra' && feeAmount > 0 && !shouldRegisterFee
+          ? totalAddedToCard
+          : principalAmount;
+      newTransactions.push({
+        id: generateSafeId(charge.mode === 'adelanto' ? 'tx-adv' : 'tx-card'),
+        type: charge.mode === 'adelanto' ? 'ingreso' : 'egreso',
+        amount: mainTxAmount,
+        date: chargeDate,
+        category: mainCategory,
+        description: mainDescription,
+        paymentMethod: charge.mode === 'adelanto' ? 'Transferencia' : 'Tarjeta Crédito',
+        relatedDebtId: debt.id,
+        notes: combinedNotes || undefined,
+        createdAt: nowIso,
+      });
+    }
+
+    const nextIncomeCategories =
+      shouldRegisterMain &&
+      charge.mode === 'adelanto' &&
+      !localData.incomeCategories.includes(mainCategory)
+        ? [...localData.incomeCategories, mainCategory].slice(0, 50)
+        : localData.incomeCategories;
+
+    const nextExpenseCategories = [...localData.expenseCategories];
+    if (
+      shouldRegisterMain &&
+      charge.mode === 'compra' &&
+      !nextExpenseCategories.includes(mainCategory)
+    ) {
+      nextExpenseCategories.push(mainCategory);
+    }
+    if (shouldRegisterFee && !nextExpenseCategories.includes(feeCategory)) {
+      nextExpenseCategories.push(feeCategory);
+    }
+
+    saveLocalData({
+      ...localData,
+      incomeCategories: nextIncomeCategories,
+      expenseCategories: nextExpenseCategories.slice(0, 50),
+      debts: shouldUpdateDebt
+        ? localData.debts.map((d) =>
+            d.id === debt.id
+              ? {
+                  ...d,
+                  currentBalance: newBalance,
+                  estimatedMonthlyInterest: rates.estimatedMonthlyInterest,
+                  status: newBalance > 0 ? (d.status === 'liquidado' ? 'al_dia' : d.status) : 'liquidado',
+                  updatedAt: nowIso,
+                }
+              : d
+          )
+        : localData.debts,
+      transactions: [...newTransactions, ...localData.transactions],
+    });
+  };
+
   // =================== SETTINGS & RESET ===================
   const resetData = async (mode: 'seed' | 'clean' = 'seed') => {
     const targetData: FinanceData =
@@ -1738,6 +1976,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteOwnDebt,
         addDebtPayment,
         deleteDebtPayment,
+        addDebtCharge,
         resetData,
         setCurrency,
         triggerManualSync,

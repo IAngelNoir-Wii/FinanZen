@@ -34,14 +34,36 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
   selectedDebtId,
   onClearSelectedDebt,
 }) => {
-  const { data, addOwnDebt, updateOwnDebt, deleteOwnDebt, addDebtPayment, deleteDebtPayment } =
-    useFinance();
+  const {
+    data,
+    addOwnDebt,
+    deleteOwnDebt,
+    addDebtPayment,
+    deleteDebtPayment,
+    addDebtCharge,
+  } = useFinance();
 
   const [activeDebtId, setActiveDebtId] = useState<string | null>(selectedDebtId || null);
   const [isAddDebtModalOpen, setIsAddDebtModalOpen] = useState(false);
   const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
   const [paymentTargetDebt, setPaymentTargetDebt] = useState<OwnDebt | null>(null);
   const [showAmortizationSim, setShowAmortizationSim] = useState(false);
+
+  // Charge / Cash Advance Modal State
+  const [isAddChargeModalOpen, setIsAddChargeModalOpen] = useState(false);
+  const [chargeTargetDebt, setChargeTargetDebt] = useState<OwnDebt | null>(null);
+  const [chargeMode, setChargeMode] = useState<'compra' | 'adelanto'>('adelanto');
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeServiceFee, setChargeServiceFee] = useState('5000');
+  const [chargeDate, setChargeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [chargeCategory, setChargeCategory] = useState(
+    data.expenseCategories[0] || 'Imprevistos y Varios'
+  );
+  const [chargeDescription, setChargeDescription] = useState('');
+  const [chargeNotes, setChargeNotes] = useState('');
+  const [chargeUpdateDebt, setChargeUpdateDebt] = useState(true);
+  const [chargeRegisterMain, setChargeRegisterMain] = useState(true);
+  const [chargeRegisterFee, setChargeRegisterFee] = useState(true);
 
   // New Debt Form State
   const [newCreditor, setNewCreditor] = useState('');
@@ -151,6 +173,53 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
     setPaymentPrincipal('');
     setPaymentNotes('');
     setPaymentTargetDebt(null);
+  };
+
+  const openChargeModal = (debt: OwnDebt, initialMode: 'compra' | 'adelanto' = 'adelanto') => {
+    setChargeTargetDebt(debt);
+    setChargeMode(initialMode);
+    setChargeAmount('');
+    setChargeServiceFee(initialMode === 'adelanto' ? '5000' : '0');
+    setChargeDate(new Date().toISOString().split('T')[0]);
+    setChargeCategory(data.expenseCategories[0] || 'Imprevistos y Varios');
+    setChargeDescription('');
+    setChargeNotes('');
+    setChargeUpdateDebt(true);
+    setChargeRegisterMain(true);
+    setChargeRegisterFee(true);
+    setIsAddChargeModalOpen(true);
+  };
+
+  const handleAddCharge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chargeTargetDebt) return;
+    const amountNum = parseFloat(chargeAmount);
+    const feeNum = Math.max(0, parseFloat(chargeServiceFee) || 0);
+    if (isNaN(amountNum) || amountNum <= 0) return;
+
+    await addDebtCharge({
+      debtId: chargeTargetDebt.id,
+      mode: chargeMode,
+      amount: amountNum,
+      serviceFee: feeNum,
+      date: chargeDate,
+      category: chargeMode === 'compra' ? chargeCategory : undefined,
+      description:
+        chargeDescription.trim() ||
+        (chargeMode === 'adelanto'
+          ? `Adelanto a cuenta desde ${chargeTargetDebt.creditor}`
+          : `Compra con ${chargeTargetDebt.creditor}`),
+      notes: chargeNotes.trim() || undefined,
+      registerInCashFlow: chargeRegisterMain,
+      registerFeeInCashFlow: chargeRegisterFee,
+      updateDebtBalance: chargeUpdateDebt,
+    });
+
+    setIsAddChargeModalOpen(false);
+    setChargeTargetDebt(null);
+    setChargeAmount('');
+    setChargeDescription('');
+    setChargeNotes('');
   };
 
   return (
@@ -292,25 +361,39 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
                     </div>
 
                     {/* Actions */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                       <span className="text-slate-400 text-[11px]">
                         Interés: ~{formatCurrency(debt.estimatedMonthlyInterest, data.currency)}/mes
                       </span>
 
-                      {!isLiquidated && (
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setPaymentTargetDebt(debt);
-                            setPaymentAmount(String(debt.monthlyPayment || ''));
-                            setIsAddPaymentModalOpen(true);
+                            openChargeModal(debt, 'adelanto');
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-xs font-semibold transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded text-xs font-semibold transition-colors cursor-pointer"
+                          title="Registrar compra o adelanto a cuenta con esta tarjeta"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Pagar Cuota</span>
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Compra / Adelanto</span>
                         </button>
-                      )}
+
+                        {!isLiquidated && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPaymentTargetDebt(debt);
+                              setPaymentAmount(String(debt.monthlyPayment || ''));
+                              setIsAddPaymentModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Pagar Cuota</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -418,19 +501,30 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                <span>Día de Corte: {activeDebt.cutoffDay} · Día Límite de Pago: {activeDebt.paymentDay}</span>
-                <button
-                  onClick={() => {
-                    setPaymentTargetDebt(activeDebt);
-                    setPaymentAmount(String(activeDebt.monthlyPayment || ''));
-                    setIsAddPaymentModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Registrar Pago</span>
-                </button>
+              <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                <span>
+                  Día de Corte: {activeDebt.cutoffDay} · Día Límite de Pago: {activeDebt.paymentDay}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openChargeModal(activeDebt, 'adelanto')}
+                    className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>+ Compra / Adelanto</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPaymentTargetDebt(activeDebt);
+                      setPaymentAmount(String(activeDebt.monthlyPayment || ''));
+                      setIsAddPaymentModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Registrar Pago</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -535,6 +629,45 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Linked Card Charges & Cash Advances History */}
+            {(() => {
+              const debtCharges = data.transactions.filter(
+                (t) => t.relatedDebtId === activeDebt.id && t.category !== 'Pago Cuota Deuda Propia'
+              );
+              if (debtCharges.length === 0) return null;
+              return (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Compras, Adelantos y Comisiones Vinculadas
+                  </h3>
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    {debtCharges.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="p-3 bg-white hover:bg-slate-50 flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-800">{tx.description}</div>
+                          <div className="text-slate-400 text-[11px] mt-0.5">
+                            {formatDate(tx.date)} · {tx.category}
+                            {tx.notes ? ` · ${tx.notes}` : ''}
+                          </div>
+                        </div>
+                        <span
+                          className={`font-mono font-bold tabular-nums ${
+                            tx.type === 'ingreso' ? 'text-emerald-600' : 'text-amber-700'
+                          }`}
+                        >
+                          {tx.type === 'ingreso' ? '+' : ''}
+                          {formatCurrency(tx.amount, data.currency)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -873,6 +1006,281 @@ export const OwnDebtsManager: React.FC<OwnDebtsManagerProps> = ({
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-xs transition-colors"
                 >
                   Confirmar Pago
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: COMPRA O ADELANTO CON TARJETA ================= */}
+      {isAddChargeModalOpen && chargeTargetDebt && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-lg">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Compra o Adelanto · {chargeTargetDebt.creditor}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {chargeTargetDebt.concept} ({chargeTargetDebt.effectiveAnnualRate}% E.A.)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddChargeModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Toggle */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-4 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setChargeMode('adelanto');
+                  if (!chargeServiceFee || chargeServiceFee === '0') {
+                    setChargeServiceFee('5000');
+                  }
+                }}
+                className={`py-2 rounded-lg transition-colors cursor-pointer ${
+                  chargeMode === 'adelanto'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Adelanto a mi Cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChargeMode('compra');
+                  if (chargeServiceFee === '5000') {
+                    setChargeServiceFee('0');
+                  }
+                }}
+                className={`py-2 rounded-lg transition-colors cursor-pointer ${
+                  chargeMode === 'compra'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Compra / Egreso con Tarjeta
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCharge} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {chargeMode === 'adelanto'
+                      ? `Valor del Adelanto (${data.currency}) *`
+                      : `Valor de la Compra (${data.currency}) *`}
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="any"
+                    placeholder={chargeMode === 'adelanto' ? 'Ej: 500000' : 'Ej: 180000'}
+                    value={chargeAmount}
+                    onChange={(e) => setChargeAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold font-mono text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Comisión servicio</label>
+                    <button
+                      type="button"
+                      onClick={() => setChargeServiceFee('5000')}
+                      className="text-[10px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                    >
+                      $5.000
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={chargeServiceFee}
+                    onChange={(e) => setChargeServiceFee(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold font-mono text-amber-700"
+                  />
+                </div>
+              </div>
+
+              {chargeMode === 'compra' && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Grupo / Categoría del Egreso
+                  </label>
+                  <select
+                    value={chargeCategory}
+                    onChange={(e) => setChargeCategory(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
+                  >
+                    {data.expenseCategories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Concepto</label>
+                  <input
+                    type="text"
+                    placeholder={
+                      chargeMode === 'adelanto'
+                        ? `Adelanto a cuenta (${chargeTargetDebt.creditor})`
+                        : `Compra con ${chargeTargetDebt.creditor}`
+                    }
+                    value={chargeDescription}
+                    onChange={(e) => setChargeDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Fecha *</label>
+                  <input
+                    type="date"
+                    required
+                    value={chargeDate}
+                    onChange={(e) => setChargeDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Notas (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: A 6 cuotas, transferencia a Nequi..."
+                  value={chargeNotes}
+                  onChange={(e) => setChargeNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+
+              {(() => {
+                const amt = parseFloat(chargeAmount) || 0;
+                const fee = Math.max(0, parseFloat(chargeServiceFee) || 0);
+                const totalAdd = amt + fee;
+                const nextBal = chargeTargetDebt.currentBalance + (chargeUpdateDebt ? totalAdd : 0);
+                const nextRates = calculateAllRates(
+                  chargeTargetDebt.rateType,
+                  chargeTargetDebt.enteredRate,
+                  nextBal
+                );
+                return (
+                  <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 text-[11px]">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-slate-500 block">
+                          {chargeMode === 'adelanto' ? 'Entra a cuenta' : 'Valor compra'}
+                        </span>
+                        <span
+                          className={`font-bold font-mono ${
+                            chargeMode === 'adelanto' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {chargeMode === 'adelanto' ? '+' : ''}
+                          {formatCurrency(amt, data.currency)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Comisión</span>
+                        <span className="font-bold font-mono text-amber-800">
+                          {formatCurrency(fee, data.currency)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Suma a deuda</span>
+                        <span className="font-bold font-mono text-slate-900">
+                          +{formatCurrency(totalAdd, data.currency)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-amber-200/80 flex flex-wrap justify-between gap-2 text-slate-700">
+                      <span>
+                        Nuevo saldo:{' '}
+                        <b className="font-mono text-slate-900">
+                          {formatCurrency(nextBal, data.currency)}
+                        </b>
+                      </span>
+                      <span>
+                        Interés est. ({chargeTargetDebt.effectiveAnnualRate}% E.A.):{' '}
+                        <b className="font-mono text-amber-800">
+                          ~{formatCurrency(nextRates.estimatedMonthlyInterest, data.currency)}/m
+                        </b>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-1.5 text-[11px] text-slate-700">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={chargeUpdateDebt}
+                    onChange={(e) => setChargeUpdateDebt(e.target.checked)}
+                    className="rounded text-amber-600"
+                  />
+                  <span>Sumar este cargo al saldo de {chargeTargetDebt.creditor}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={chargeRegisterMain}
+                    onChange={(e) => setChargeRegisterMain(e.target.checked)}
+                    className="rounded text-indigo-600"
+                  />
+                  <span>
+                    {chargeMode === 'adelanto'
+                      ? 'Registrar el dinero recibido como ingreso en Flujo de Caja'
+                      : 'Registrar la compra como egreso en Flujo de Caja'}
+                  </span>
+                </label>
+                {(parseFloat(chargeServiceFee) || 0) > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={chargeRegisterFee}
+                      onChange={(e) => setChargeRegisterFee(e.target.checked)}
+                      className="rounded text-rose-600"
+                    />
+                    <span>Registrar la comisión por servicio como egreso en Flujo de Caja</span>
+                  </label>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddChargeModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+                >
+                  {chargeMode === 'adelanto' ? 'Registrar Adelanto' : 'Registrar Compra'}
                 </button>
               </div>
             </form>
